@@ -51,9 +51,7 @@ jobs:
       # Windows, and the Makefile defaults to it.
       - name: Run tests
         shell: bash
-        run: |
-          make PYTHON=python ci-install
-          python -u scripts/probe_shared_memory.py
+        run: make PYTHON=python ci-test
 
       - name: Run memleak tests
         if: matrix.memleaks

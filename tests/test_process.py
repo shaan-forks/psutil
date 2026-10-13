@@ -537,43 +537,31 @@ class TestProcess(PsutilTestCase):
     def test_memory_footprint_shared(self):
         # Map a file, then have a child process map it too: our
         # shared memory must grow by about the file size.
-        size = 32 * 1024 * 1024
+        # Larger mappings may be trimmed from Windows working sets before
+        # memory_footprint() samples them.
+        size = 4 * 1024 * 1024
         path = self.get_testfn()
         flag = self.get_testfn()
         with open(path, "wb") as f:
             f.write(b"\x00" * size)
-        base = psutil.Process().memory_footprint().shared
         with open(path, "r+b") as f:
-            m = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_WRITE)
+            m = mmap.mmap(f.fileno(), size)
             self.addCleanup(m.close)
             for i in range(0, size, 4096):
-                m[i] = 1
-            mapped = psutil.Process().memory_footprint().shared
+                m[i]
+            base = psutil.Process().memory_footprint().shared
             code = textwrap.dedent(f"""
                 import mmap, time
                 f = open({path!r}, 'r+b')
-                m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE)
+                m = mmap.mmap(f.fileno(), 0)
                 for i in range(0, len(m), 4096):
-                    m[i] = 1
+                    m[i]
                 open({flag!r}, 'w').close()
                 time.sleep(60)
                 """)
-            child = self.spawn_subproc(cmd=[PYTHON_EXE, "-c", code])
+            self.spawn_subproc(cmd=[PYTHON_EXE, "-c", code])
             wait_for_file(flag, empty=True)
             after = psutil.Process().memory_footprint().shared
-            print(  # noqa: T201 - temporary CI probe
-                "mmap shared pages:",
-                "parent before mapping",
-                base,
-                "parent mapped",
-                mapped,
-                "parent after",
-                after,
-                "child",
-                psutil.Process(child.pid).memory_footprint().shared,
-                "page size",
-                mmap.PAGESIZE,
-            )
         assert after - base >= size // 2
 
     def test_memory_full_info(self):
