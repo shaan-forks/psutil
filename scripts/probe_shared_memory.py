@@ -8,7 +8,7 @@ import tempfile
 
 import psutil
 
-SIZE = 32 * 1024 * 1024
+SIZE = 4 * 1024 * 1024
 STEP = mmap.PAGESIZE
 
 
@@ -96,5 +96,7 @@ with open(path, 'r+b') as file:
 
 
 print(sys.version, flush=True)
-probe(mmap.ACCESS_WRITE)
-probe(mmap.ACCESS_READ)
+for attempt in range(3):
+    print(f"attempt={attempt + 1}", flush=True)
+    probe(mmap.ACCESS_WRITE)
+    probe(mmap.ACCESS_READ)
