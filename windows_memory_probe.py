@@ -217,7 +217,7 @@ def metadata():
     }
 
 
-def probe(mode, destination=None):
+def probe(mode, destination=None, open_policy="original"):
     from tests import PYTHON_EXE
     from tests import PYTHON_EXE_ENV
     from tests import reap_children
@@ -225,10 +225,12 @@ def probe(mode, destination=None):
     from tests import wait_for_file
 
     assert mode in {"discarded", "checksum"}
+    assert open_policy in {"original", "identity", "random"}
     assert mmap.PAGESIZE == STEP
     api = WindowsAPI()
     outcome = {
         "mode": mode,
+        "open_policy": open_policy,
         "size": SIZE,
         "step": STEP,
         "metadata": metadata(),
@@ -250,7 +252,15 @@ def probe(mode, destination=None):
         reply = Path(directory) / "reply.json"
         with path.open("wb") as file:
             file.write(b"\0" * SIZE)
-        with path.open("r+b") as file:
+        opener = None
+        if open_policy != "original":
+
+            def opener(name, flags):
+                if open_policy == "random":
+                    flags |= os.O_RANDOM
+                return os.open(name, flags)
+
+        with open(path, "r+b", opener=opener) as file:
             mapping = mmap.mmap(file.fileno(), SIZE)
         try:
             base = ctypes.addressof(ctypes.c_char.from_buffer(mapping))
@@ -275,10 +285,21 @@ def probe(mode, destination=None):
             )
             # Same spawn/wait helpers and one child as the fixture. Metadata
             # and post-snapshot data handshake add diagnostic overhead.
+            child_open = f"f = open({str(path)!r}, 'r+b')"
+            if open_policy != "original":
+                child_flags = (
+                    "flags | os.O_RANDOM"
+                    if open_policy == "random"
+                    else "flags"
+                )
+                child_open = (
+                    f"f = open({str(path)!r}, 'r+b', "
+                    f"opener=lambda name, flags: os.open(name, {child_flags}))"
+                )
             code = (
                 textwrap.dedent(f"""
                 import mmap, time, ctypes, json, os
-                f = open({str(path)!r}, 'r+b')
+                {child_open}
                 m = mmap.mmap(f.fileno(), 0)
                 address = ctypes.addressof(ctypes.c_char.from_buffer(m))
                 checksum = None
@@ -287,7 +308,10 @@ def probe(mode, destination=None):
                 + "\n"
                 + textwrap.dedent(f"""
                 with open({str(info_path)!r}, 'w') as stream:
-                    json.dump(dict(address=address, checksum=checksum), stream)
+                    json.dump(dict(
+                        address=address, checksum=checksum,
+                        open_policy={open_policy!r}
+                    ), stream)
                 open({str(flag)!r}, 'w').close()
                 deadline = time.monotonic() + 60
                 while not os.path.exists({str(control)!r}):
@@ -314,6 +338,7 @@ def probe(mode, destination=None):
             # wait_for_file uses the fixture's timeout/readiness semantics.
             wait_for_file(str(flag), empty=True)
             child_info = json.loads(info_path.read_text())
+            assert child_info["open_policy"] == open_policy
             outcome["child_info"] = child_info
             outcome["parent_after_child"] = api.snapshot(os.getpid(), base)
             outcome["child_after_touch"] = api.snapshot(
@@ -355,7 +380,8 @@ def probe(mode, destination=None):
 
 
 if __name__ == "__main__":
-    result = probe(sys.argv[1], sys.argv[2])
+    policy = sys.argv[3] if len(sys.argv) > 3 else "original"
+    result = probe(sys.argv[1], sys.argv[2], policy)
     print(
         json.dumps(
             {

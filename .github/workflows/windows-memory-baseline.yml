@@ -41,7 +41,7 @@ jobs:
           PYTHON315: ${{ steps.py315.outputs.python-path }}
           BASELINE_OUTPUT: ${{ runner.temp }}/psutil-windows-memory-baseline
           BASELINE_SHA: ${{ github.sha }}
-          BASELINE_PHASE: probe
+          BASELINE_PHASE: random-open
         run: |
           & $env:PYTHON315 source-315/windows_memory_baseline.py
           exit $LASTEXITCODE

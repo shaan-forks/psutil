@@ -14,7 +14,7 @@ def main():
     output.mkdir(parents=True, exist_ok=True)
     workspace = Path(os.environ['GITHUB_WORKSPACE'])
     phase = os.environ.get('BASELINE_PHASE', 'baseline')
-    assert phase in ('baseline', 'probe')
+    assert phase in ('baseline', 'probe', 'random-open')
     results = []
     environments = {}
     environment = os.environ.copy()
@@ -101,7 +101,7 @@ def main():
     # Same physical runner, reversing order on alternating repetitions.
     # Focused tests are entirely unchanged; failures are retained, not retried away.
     target = 'tests/test_process.py::TestProcess::test_memory_footprint_shared'
-    for repetition in range(1 if phase == 'probe' else 4):
+    for repetition in range(4 if phase == 'baseline' else 1):
         order = ('314', '315') if repetition % 2 == 0 else ('315', '314')
         for version in order:
             if version in environments:
@@ -109,7 +109,18 @@ def main():
                 run(f'{version}-focused-{repetition + 1}',
                     [python, *pytest_args, target], source)
 
-    if phase == 'probe':
+    if phase == 'random-open':
+        for repetition in range(2):
+            versions = ('314', '315') if repetition == 0 else ('315', '314')
+            policies = ('original', 'identity', 'random') if repetition == 0 else ('random', 'identity', 'original')
+            for version in versions:
+                if version in environments:
+                    source, python = environments[version]
+                    for policy in policies:
+                        label = f'{version}-open-{policy}-{repetition + 1}'
+                        run(label, [python, 'windows_memory_probe.py', 'discarded',
+                            str(output / f'{label}.json'), policy], source)
+    elif phase == 'probe':
         for repetition in range(2):
             versions = ('314', '315') if repetition == 0 else ('315', '314')
             modes = ('discarded', 'checksum') if repetition == 0 else ('checksum', 'discarded')
