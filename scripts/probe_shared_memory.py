@@ -12,8 +12,10 @@ SIZE = 32 * 1024 * 1024
 STEP = mmap.PAGESIZE
 
 
-def shared(pid=None):
-    return psutil.Process(pid).memory_footprint().shared
+def metrics(pid=None):
+    process = psutil.Process(pid)
+    footprint = process.memory_footprint()
+    return footprint.uss, footprint.shared, process.memory_info().rss
 
 
 def probe(access):
@@ -31,7 +33,7 @@ def probe(access):
             else:
                 checksum = sum(mapping[i] for i in range(0, SIZE, STEP))
                 print("parent read checksum:", checksum, flush=True)
-            before = shared()
+            before = metrics()
             code = """
 import mmap, sys, time
 path, access, step = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
@@ -67,17 +69,21 @@ with open(path, 'r+b') as file:
                 print(line.rstrip(), flush=True)
                 if line.strip() == "ready":
                     break
-            after = shared()
-            child_shared = shared(child.pid)
+            after = metrics()
+            child_metrics = metrics(child.pid)
             visibility = [mapping[i] for i in (0, SIZE // 2, SIZE - STEP)]
+            retouch = sum(mapping[i] for i in range(0, SIZE, STEP))
+            after_retouch = metrics()
             with open(path, "rb") as file2:
                 disk = [file2.read(1)[0]]
                 file2.seek(SIZE // 2)
                 disk.append(file2.read(1)[0])
             print(
                 f"access={access} before={before} after={after} "
-                f"delta={after - before} child={child_shared} "
-                f"parent_sees={visibility} disk={disk}",
+                f"delta_shared={after[1] - before[1]} "
+                f"child={child_metrics} after_retouch={after_retouch} "
+                f"retouch_checksum={retouch} parent_sees={visibility} "
+                f"disk={disk}",
                 flush=True,
             )
     finally:
