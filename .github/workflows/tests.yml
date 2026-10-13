@@ -30,24 +30,14 @@ jobs:
   tests:
     name: "${{ matrix.osname }} ${{ matrix.arch }} (py${{ matrix.python }})"
     # Skip same-repo PR runs: the push event already covers them.
-    if: &skip_same_repo_pr github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, osname: linux, arch: x86_64, python: "3.14", memleaks: true }
-          - { os: ubuntu-latest, osname: linux, arch: x86_64, python: "3.15", memleaks: true }
-          - { os: ubuntu-24.04-arm, osname: linux, arch: aarch64, python: "3.8" }
-          - { os: ubuntu-latest, osname: linux, arch: x86_64, python: "3.14t" }
-          - { os: ubuntu-latest, osname: linux, arch: x86_64, python: "3.15t" }
-          - { os: macos-15, osname: macos, arch: arm64, python: "3.14", memleaks: true }
-          - { os: macos-15, osname: macos, arch: arm64, python: "3.15", memleaks: true }
-          - { os: macos-15-intel, osname: macos, arch: x86_64, python: "3.13" } # py 3.9 install is too slow
-          - { os: windows-2025, osname: win, arch: AMD64, python: "3.10", memleaks: true }
-          - { os: windows-11-arm, osname: win, arch: ARM64, python: "3.14" }
-          - { os: windows-11-arm, osname: win, arch: ARM64, python: "3.15" }
+          - { os: windows-11-arm, osname: win, arch: ARM64, python: "3.15", memleaks: false }
     steps:
       - uses: actions/checkout@v7
 
@@ -69,7 +59,7 @@ jobs:
 
   # Run linters + bots tests
   linters:
-    if: *skip_same_repo_pr
+    if: github.ref != 'refs/heads/ci/win315-shared-memory-probe'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

@@ -544,14 +544,14 @@ class TestProcess(PsutilTestCase):
             m = mmap.mmap(f.fileno(), size)
             self.addCleanup(m.close)
             for i in range(0, size, 4096):
-                m[i]
+                m[i] = 1
             base = psutil.Process().memory_footprint().shared
             code = textwrap.dedent(f"""
                 import mmap, time
                 f = open({path!r}, 'r+b')
                 m = mmap.mmap(f.fileno(), 0)
                 for i in range(0, len(m), 4096):
-                    m[i]
+                    m[i] = 1
                 open({flag!r}, 'w').close()
                 time.sleep(60)
                 """)
