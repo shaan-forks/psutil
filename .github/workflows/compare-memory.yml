@@ -1,0 +1,42 @@
+name: compare-memory
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  compare:
+    runs-on: windows-11-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Python 3.14
+        id: py314
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Probe Python 3.14 before installing 3.15
+        shell: bash
+        run: |
+          make PYTHON=python ci-install
+          python -u probe_shared_memory.py
+
+      - name: Install Python 3.15
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.15"
+
+      - name: Probe Python 3.15
+        shell: bash
+        run: |
+          make PYTHON=python ci-install
+          python -u probe_shared_memory.py
+
+      - name: Probe Python 3.14 after installing 3.15
+        shell: bash
+        env:
+          PY314: ${{ steps.py314.outputs.python-path }}
+        run: '"$PY314" -u probe_shared_memory.py'
