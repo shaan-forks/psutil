@@ -541,7 +541,7 @@ class TestProcess(PsutilTestCase):
         with open(path, "wb") as f:
             f.write(b"\x00" * size)
         with open(path, "r+b") as f:
-            m = mmap.mmap(f.fileno(), size)
+            m = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_WRITE)
             self.addCleanup(m.close)
             for i in range(0, size, 4096):
                 m[i] = 1
@@ -549,15 +549,22 @@ class TestProcess(PsutilTestCase):
             code = textwrap.dedent(f"""
                 import mmap, time
                 f = open({path!r}, 'r+b')
-                m = mmap.mmap(f.fileno(), 0)
+                m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_WRITE)
                 for i in range(0, len(m), 4096):
                     m[i] = 1
                 open({flag!r}, 'w').close()
                 time.sleep(60)
                 """)
-            self.spawn_subproc(cmd=[PYTHON_EXE, "-c", code])
+            child = self.spawn_subproc(cmd=[PYTHON_EXE, "-c", code])
             wait_for_file(flag, empty=True)
             after = psutil.Process().memory_footprint().shared
+            print(  # noqa: T201 - temporary CI probe
+                "mmap shared pages:",
+                "parent before", base,
+                "parent after", after,
+                "child", psutil.Process(child.pid).memory_footprint().shared,
+                "page size", mmap.PAGESIZE,
+            )
         assert after - base >= size // 2
 
     def test_memory_full_info(self):
