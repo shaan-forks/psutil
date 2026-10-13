@@ -14,6 +14,7 @@
 on:
   workflow_dispatch:
   push:
+    branches-ignore: [ci/validation-winarm-baseline-20261013]
     paths-ignore:
       - "docs/**"
   pull_request:

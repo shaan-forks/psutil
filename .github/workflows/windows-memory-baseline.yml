@@ -1,0 +1,53 @@
+# Disposable diagnostic workflow; never part of the upstream candidate.
+name: Windows ARM64 matched memory baseline
+on:
+  push:
+    branches: [ci/validation-winarm-baseline-20261013]
+permissions:
+  contents: read
+jobs:
+  baseline:
+    runs-on: windows-11-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: source-314
+          persist-credentials: false
+      - uses: actions/checkout@v7
+        with:
+          path: source-315
+          persist-credentials: false
+      - name: Install ordinary Python 3.14
+        id: py314
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+          architecture: arm64
+      - name: Install ordinary Python 3.15
+        id: py315
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.15'
+          architecture: arm64
+      - name: Resolve the Makefile's Git Bash cache directory
+        shell: bash
+        run: |
+          printf 'BASELINE_CACHE=%s\n' "$(cygpath -w /tmp/pytest-psutil-cache)" >> "$GITHUB_ENV"
+      - name: Build separate environments and run interleaved baselines
+        shell: pwsh
+        env:
+          PYTHON314: ${{ steps.py314.outputs.python-path }}
+          PYTHON315: ${{ steps.py315.outputs.python-path }}
+          BASELINE_OUTPUT: ${{ runner.temp }}/psutil-windows-memory-baseline
+          BASELINE_SHA: ${{ github.sha }}
+        run: |
+          & $env:PYTHON315 source-315/windows_memory_baseline.py
+          exit $LASTEXITCODE
+      - name: Preserve baseline logs even when tests fail
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-arm64-memory-baseline
+          path: ${{ runner.temp }}/psutil-windows-memory-baseline
+          if-no-files-found: error

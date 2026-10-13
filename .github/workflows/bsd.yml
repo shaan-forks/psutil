@@ -7,6 +7,7 @@
 on:
   workflow_dispatch:
   push:
+    branches-ignore: [ci/validation-winarm-baseline-20261013]
     # only run this job if the following files are modified
     paths: &bsd_paths
       - ".github/workflows/bsd.yml"
