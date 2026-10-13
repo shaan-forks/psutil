@@ -545,7 +545,7 @@ class TestProcess(PsutilTestCase):
         with open(path, "wb") as f:
             f.write(b"\x00" * size)
         with open(path, "r+b") as f:
-            m = mmap.mmap(f.fileno(), size)
+            m = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_READ)
             self.addCleanup(m.close)
             for i in range(0, size, 4096):
                 m[i]
@@ -553,7 +553,7 @@ class TestProcess(PsutilTestCase):
             code = textwrap.dedent(f"""
                 import mmap, time
                 f = open({path!r}, 'r+b')
-                m = mmap.mmap(f.fileno(), 0)
+                m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
                 for i in range(0, len(m), 4096):
                     m[i]
                 open({flag!r}, 'w').close()
