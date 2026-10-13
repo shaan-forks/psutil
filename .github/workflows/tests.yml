@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           make PYTHON=python ci-install
-          python -m pytest -s -q tests/test_process.py::TestProcess::test_memory_footprint_shared
+          python -u scripts/probe_shared_memory.py
 
       - name: Run memleak tests
         if: matrix.memleaks
