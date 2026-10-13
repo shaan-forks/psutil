@@ -323,9 +323,11 @@ class TestProcess(PsutilTestCase):
                 if PYPY:
                     continue
                 expected = tuple(
-                    psutil.RLIM_INFINITY
-                    if limit == resource.RLIM_INFINITY
-                    else limit
+                    (
+                        psutil.RLIM_INFINITY
+                        if limit == resource.RLIM_INFINITY
+                        else limit
+                    )
                     for limit in resource.getrlimit(value)
                 )
                 assert p.rlimit(value) == expected
@@ -540,12 +542,13 @@ class TestProcess(PsutilTestCase):
         flag = self.get_testfn()
         with open(path, "wb") as f:
             f.write(b"\x00" * size)
+        base = psutil.Process().memory_footprint().shared
         with open(path, "r+b") as f:
             m = mmap.mmap(f.fileno(), size, access=mmap.ACCESS_WRITE)
             self.addCleanup(m.close)
             for i in range(0, size, 4096):
                 m[i] = 1
-            base = psutil.Process().memory_footprint().shared
+            mapped = psutil.Process().memory_footprint().shared
             code = textwrap.dedent(f"""
                 import mmap, time
                 f = open({path!r}, 'r+b')
@@ -560,10 +563,16 @@ class TestProcess(PsutilTestCase):
             after = psutil.Process().memory_footprint().shared
             print(  # noqa: T201 - temporary CI probe
                 "mmap shared pages:",
-                "parent before", base,
-                "parent after", after,
-                "child", psutil.Process(child.pid).memory_footprint().shared,
-                "page size", mmap.PAGESIZE,
+                "parent before mapping",
+                base,
+                "parent mapped",
+                mapped,
+                "parent after",
+                after,
+                "child",
+                psutil.Process(child.pid).memory_footprint().shared,
+                "page size",
+                mmap.PAGESIZE,
             )
         assert after - base >= size // 2
 
